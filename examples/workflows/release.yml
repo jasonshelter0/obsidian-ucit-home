@@ -1,0 +1,26 @@
+name: Release
+on:
+  push:
+    tags: ['[0-9]*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - name: Verify version
+        run: node -e 'if (process.env.GITHUB_REF_NAME !== require("./manifest.json").version) process.exit(1)'
+      - run: npm run package
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/main.js dist/manifest.json dist/styles.css dist/ucit-home.zip dist/SHA256SUMS --verify-tag --title "UCIT Home $GITHUB_REF_NAME" --notes-file CHANGELOG.md
