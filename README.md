@@ -4,6 +4,8 @@ An Obsidian plugin by **Jason Shelter** ([jasonshelter0](https://github.com/jaso
 
 The interface is currently Chinese. Your Markdown files remain the task ledger. No accounts, cloud service, shell execution or AI API are required.
 
+[Usage website](https://www.jasonshelter.com/en/projects/ucit-home/) · [中文指南](https://www.jasonshelter.com/zh-cn/projects/ucit-home/) · [Guide français](https://www.jasonshelter.com/fr/projects/ucit-home/)
+
 ## Install
 
 Download `ucit-home.zip` from [Releases](https://github.com/jasonshelter0/obsidian-ucit-home/releases/latest), extract the `ucit-home` folder into your vault's `.obsidian/plugins/`, then enable **UCIT Home**. To update, replace `main.js`, `manifest.json` and `styles.css`; preserve your `data.json`.
@@ -113,9 +115,13 @@ npm run package
 
 Tests use real YAML and Moment libraries with an in-memory Obsidian API/DOM. An optional `UCIT_TEST_FIXTURES` path enables a read-only local-vault validation case; no personal fixture is included in this repository. A mocked UI test does not replace checking actual Obsidian rendering, especially on mobile.
 
-`npm run package` writes an allowlisted release to `dist/`: individual runtime assets, `ucit-home.zip`, and `SHA256SUMS`. It does not package the source checkout, tests, dependencies or local settings.
+`npm run package` writes an allowlisted release to `dist/`: individual runtime assets, `ucit-home.zip`, the separate `usage.json` guide, and `SHA256SUMS`. It does not package the source checkout, tests, dependencies or local settings.
 
 Workflow templates are provided in `examples/workflows/`. They are not active: the publishing credential does not have GitHub workflow permission. To enable automated CI and tag releases later, install them under `.github/workflows/` using a workflow-capable credential. This release was tested and packaged locally, then uploaded directly. Version tags match `manifest.json` without a `v` prefix for plugin updater compatibility.
+
+## Documentation and future releases
+
+The usage website is generated from `docs/usage.json`. Follow [the maintenance guide](docs/MAINTAINING.md): `npm run docs:sync -- /path/to/personal-website` updates the website source, and `npm run release:publish` refuses publication until the live guide matches this version and content hash. Website deployment retains its authenticated preview and deployment lock.
 
 ## License
 

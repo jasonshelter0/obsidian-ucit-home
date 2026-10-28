@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "pluginVersion": "0.3.0",
+  "updated": "2026-10-28",
+  "author": "Jason Shelter",
+  "repository": "https://github.com/jasonshelter0/obsidian-ucit-home",
+  "locales": {
+    "en": {
+      "title": "UCIT Home · Usage guide",
+      "summary": "Turn project notes into commitments you can plan, review and close with evidence.",
+      "labels": {
+        "eyebrow": "Obsidian / Jason Shelter",
+        "download": "Download plugin",
+        "source": "Source & issues",
+        "contents": "In this guide",
+        "version": "Plugin version",
+        "updated": "Guide updated",
+        "loop": "A loop that ends with evidence",
+        "stateHint": "Open a state to see what it means and what moves work forward.",
+        "copy": "Copy example",
+        "copied": "Copied",
+        "copyError": "Select and copy the code manually.",
+        "example": "Example project",
+        "note": "Interface language: Chinese. This guide is available in three languages."
+      },
+      "states": [
+        {
+          "code": "P",
+          "name": "Planned",
+          "body": "Define an outcome, acceptance criteria and the next action. A plan is a commitment candidate, not work already in progress."
+        },
+        {
+          "code": "A",
+          "name": "Active",
+          "body": "Activate the parent project first. Dependencies must be closed as done; keep a next action and review date. Limit concurrent work."
+        },
+        {
+          "code": "W",
+          "name": "Waiting",
+          "body": "Record waiting_for: who or what you depend on. Keep a next action and review_on so the wait has a follow-up."
+        },
+        {
+          "code": "S",
+          "name": "Suspended",
+          "body": "Record resume_when: the condition for restarting. Make the pause intentional; review it rather than quietly forgetting it."
+        },
+        {
+          "code": "C",
+          "name": "Closed",
+          "body": "Attach evidence or a decision record. Choose done, cancelled or merged. Only done satisfies downstream dependencies."
+        }
+      ],
+      "sections": [
+        {
+          "id": "install",
+          "title": "01 / Install & update",
+          "body": "Requires **Obsidian 1.5.0+**. Download `ucit-home.zip` from the release page, extract the `ucit-home` folder into your vault’s `.obsidian/plugins/`, then enable **UCIT Home** in Community plugins. The plugin is not yet listed in the community catalog.\n\nFor updates, replace `main.js`, `manifest.json` and `styles.css`, keep `data.json`, then reload the plugin. That file preserves settings and task ID reservations.\n\nYou can also add `jasonshelter0/obsidian-ucit-home` to BRAT. New Calendar Suite is optional. No account, cloud service or AI key is required."
+        },
+        {
+          "id": "start",
+          "title": "02 / Your first useful project",
+          "body": "Start with one real deliverable. Create `projects/DEMO-001/HOME.md` using the example below. Replace its sample dates, goal and outcome with your own. UCIT indexes Markdown under `projects/` only when it has `ucit_version: 2` and `kind: project` or `task`.\n\n```yaml\n---\nucit_version: 2\nkind: project\nucit: DEMO-001\narea: '[[Work]]'\nstatus: planned\ngoal: Build one useful prototype\noutcome: A working prototype with a demonstrated use case\nnext_action: Specify the first acceptance test\nreview_on: '2027-01-04'\nbudget: 4 hours this week\ntask_source: projects/DEMO-001/tasks\n---\n# Prototype\n```\n\n1. Run **UCIT Home: 打开今日主页** from the command palette.\n2. Use **调整 / 闭环** to activate the project. Keep its goal, outcome, budget, task source, next action and review date explicit.\n3. Choose **＋ 子任务**. Describe the next action and acceptance criteria before scheduling it.\n4. A task such as `DEMO-001-T001` gets its own folder under `projects/DEMO-001/tasks/`. Keep its identifier stable even when its title changes.\n5. Activate the task, produce the artifact, then attach evidence and close it with `resolution: done`.\n\nDo not copy task state into every daily note. Link to the original task or embed a live UCIT panel."
+        },
+        {
+          "id": "routine",
+          "title": "03 / A daily, weekly and monthly loop",
+          "body": "**Daily — choose, execute, close.** Open Today, select a date and schedule only the work you can fit. `scheduled_on` is that task’s work date; `estimate_hours` reserves capacity on that date. The dashboard compares the total with your daily capacity (8 hours by default). These are estimates, not a timer. Finish with an artifact link, an explicit waiting condition or a revised next action.\n\n**Weekly — resolve open commitments.** Open Week. Review overdue deliveries, upcoming review dates and waiting tasks. Confirm what is still worth doing; suspend, cancel or reschedule deliberately. Keep active projects few enough to finish them.\n\n**Monthly — check outcomes.** Open Month. Compare completed evidence with each project’s stated outcome. Separate successful completion from cancellation or merging. Turn useful methods into reusable notes and link them to the next project.\n\n`due` means delivery date; `review_on` means follow-up date. A task currently has one scheduled date, not a multi-day time-blocking plan. The period panels show current work, including earlier open commitments and active/waiting items: they are not historical snapshots.\n\nStandalone daily, weekly and monthly folders, homepage path, timezone and capacity are configurable. Standalone weeks start Monday. Legacy PALXOS codes do not determine whether a UCIT v2 task is active: the explicit PAWSC `status` does."
+        },
+        {
+          "id": "calendar",
+          "title": "04 / New Calendar Suite",
+          "body": "Enable both plugins and **连接 New Calendar Suite** in UCIT settings. The bridge is designed against **New Calendar Suite 1.4.5**, also by Jason Shelter.\n\n- **One set of periodic notes.** Day/week/month actions use NCS folders, filenames, templates and creation behavior. Week boundaries follow NCS’s Moment locale. Without NCS, UCIT uses its standalone settings.\n- **NC periods.** Open a phase, month, season or year. UCIT dates remain Gregorian `YYYY-MM-DD`; NCS supplies the NC period boundaries.\n- **Calendar markers.** Red means deadline/overdue, blue scheduled work, amber review, green successful closure. A dot indicates a category, not an exact count. Cancellation is not a green completion.\n- **From note to action.** Commands can open the dashboard or create a task for the current periodic note’s date.\n\nAdd the following block in Reading view or a rendered Live Preview block:\n\n````markdown\n```ucit\nperiod: week\ndate: 2027-01-04\nproject: DEMO-001\nshow_closed: false\n```\n````\n\nUse `period: auto` in a dated periodic note. Supported explicit periods: `day`, `week`, `month`, `nc-phase`, `nc-month`, `nc-season`, `nc-year`. Omit `project` to include all projects. Auto detection reads NCS frontmatter and configured filenames; ordinary notes may need an explicit period and date.\n\nUCIT reconnects existing calendar panes on startup; their position is preserved, but the displayed month may reset. Run **UCIT Home: 连接 GC / NC 日历标记** if markers are missing. An incompatible NCS bridge reports an error instead of creating a duplicate fallback note. UCIT does not run Templater itself."
+        },
+        {
+          "id": "fields",
+          "title": "05 / Fields & closure rules",
+          "body": "| Field | Meaning |\n| --- | --- |\n| `ucit` / `parent` | Stable record ID / wikilink to the parent project on tasks |\n| `status` | `planned`, `active`, `waiting`, `suspended`, `closed` |\n| `next_action` / `acceptance` | The next observable action / the test for completion |\n| `depends_on` | IDs of prerequisite tasks; only `closed` + `done` satisfies them |\n| `scheduled_on` / `estimate_hours` | Planned work date / reserved hours on that date |\n| `due` / `review_on` | Delivery deadline / next review date |\n| `waiting_for` / `resume_when` | Waiting condition / restart condition |\n| `evidence` / `resolution` | Artifact or decision record / `done`, `cancelled`, `merged` |\n\nEvery edit needs a reason and appends a change history. The editor prevents stale overwrites, unknown dependencies, dependency cycles and conflicting states. You cannot close a project with open children, suspend a project with active children, or invalidate a completed dependency already used by active work.\n\nEvidence is required for closure, but the plugin cannot judge whether your evidence is true or meets the acceptance criteria. That remains part of your review."
+        },
+        {
+          "id": "help",
+          "title": "06 / Troubleshooting & data ownership",
+          "body": "**Nothing appears?** Check that the note is below `projects/`, has `ucit_version: 2`, a valid kind and a unique `ucit` ID. Ordinary notes are intentionally not treated as tasks.\n\n**Cannot activate or close?** Read the validation message. Activate the parent, finish prerequisites as `done`, fill required fields, or resolve open children first.\n\n**Periodic panel has the wrong range?** Try an explicit `period` and `date`, then check NCS week settings. Source mode shows the block’s text; Reading view renders the panel.\n\n**An edit is stale?** Reopen the editor to load the current note. Work with one writer at a time across devices and external scripts. There is no distributed transaction lock.\n\nYour Markdown remains the ledger. Unknown fields and note bodies are preserved, but YAML formatting and comments can change. Preserve `data.json` when migrating so reserved identifiers are not reused. UCIT does not execute shell commands, launch experiments or run autonomous research.\n\nReport reproducible issues in the repository with plugin/Obsidian/NCS versions and a minimal fictional example. The release tests use mocked Obsidian APIs; actual mobile rendering is not yet verified."
+        },
+        {
+          "id": "updates",
+          "title": "07 / Versions & documentation",
+          "body": "This page states the plugin version it documents. Its content is maintained in `docs/usage.json` in the plugin repository and synchronized into this site as a frozen, reviewed copy. The website never reads your vault.\n\nFor each future plugin release: update all three guide languages, run the documentation checks and sync command, deploy and verify the website, then publish the plugin through the release command. That command checks the live guide’s version and content hash before publishing. See the repository’s maintainer guide for exact commands.\n\nDocumentation-only corrections can use the same sync and website deployment flow without changing the plugin binary."
+        }
+      ]
+    },
+    "zh-CN": {
+      "title": "UCIT Home · 使用指南",
+      "summary": "把项目笔记变成可安排、可复查、以成果证据结束的行动承诺。",
+      "labels": {
+        "eyebrow": "Obsidian / Jason Shelter",
+        "download": "下载插件",
+        "source": "源码与问题反馈",
+        "contents": "本页目录",
+        "version": "插件版本",
+        "updated": "指南更新",
+        "loop": "以证据结束，再进入下一轮",
+        "stateHint": "展开任一状态，了解它的含义及下一步。",
+        "copy": "复制示例",
+        "copied": "已复制",
+        "copyError": "请选中代码后手动复制。",
+        "example": "示例项目",
+        "note": "插件界面目前为中文；本指南提供中、英、法三种语言。"
+      },
+      "states": [
+        {
+          "code": "P",
+          "name": "计划中",
+          "body": "先明确成果、验收标准和下一步。计划是候选承诺，不代表已经投入执行。"
+        },
+        {
+          "code": "A",
+          "name": "执行中",
+          "body": "先激活所属项目；前置任务须以 done 完成。保留下一步和复查日期，限制同时开展的工作。"
+        },
+        {
+          "code": "W",
+          "name": "等待中",
+          "body": "用 waiting_for 写明等谁或等什么。保留下一步与 review_on，让等待有明确的跟进点。"
+        },
+        {
+          "code": "S",
+          "name": "暂停中",
+          "body": "用 resume_when 写明恢复条件。主动暂停，并在复查时决定是否恢复，不让任务悄悄消失。"
+        },
+        {
+          "code": "C",
+          "name": "已关闭",
+          "body": "附上成果证据或决策记录，选择 done、cancelled 或 merged。只有 done 能满足后续任务的依赖。"
+        }
+      ],
+      "sections": [
+        {
+          "id": "install",
+          "title": "01 / 安装与更新",
+          "body": "需要 **Obsidian 1.5.0 或以上**。从发布页下载 `ucit-home.zip`，把其中的 `ucit-home` 文件夹解压到仓库的 `.obsidian/plugins/`，再到第三方插件设置中启用 **UCIT Home**。目前尚未上架 Obsidian 社区插件目录。\n\n更新时替换 `main.js`、`manifest.json` 和 `styles.css`，保留 `data.json`，然后重载插件。该文件保存设置和已预留的任务编号。\n\n也可在 BRAT 中添加 `jasonshelter0/obsidian-ucit-home`。New Calendar Suite 为可选集成。不需要注册账号、云服务或 AI 密钥。"
+        },
+        {
+          "id": "start",
+          "title": "02 / 建立第一个有成果的项目",
+          "body": "从一个真实的交付物开始。用下方示例创建 `projects/DEMO-001/HOME.md`，把日期、目标和成果替换为自己的内容。UCIT 只索引 `projects/` 中具有 `ucit_version: 2` 且 `kind` 为 `project` 或 `task` 的 Markdown 笔记。\n\n```yaml\n---\nucit_version: 2\nkind: project\nucit: DEMO-001\narea: '[[Work]]'\nstatus: planned\ngoal: Build one useful prototype\noutcome: A working prototype with a demonstrated use case\nnext_action: Specify the first acceptance test\nreview_on: '2027-01-04'\nbudget: 4 hours this week\ntask_source: projects/DEMO-001/tasks\n---\n# Prototype\n```\n\n1. 在命令面板运行 **UCIT Home: 打开今日主页**。\n2. 点击 **调整 / 闭环**，激活项目；明确目标、成果、预算、任务目录、下一步和复查日期。\n3. 点击 **＋ 子任务**，先写下一步行动和验收标准，再安排日期。\n4. 例如 `DEMO-001-T001` 会在 `projects/DEMO-001/tasks/` 下拥有独立子文件夹。改标题时保留编号。\n5. 激活任务，制作交付物，附上证据，然后以 `resolution: done` 关闭。\n\n不要把任务状态复制到每一篇日记中。链接原始任务，或嵌入实时 UCIT 面板。"
+        },
+        {
+          "id": "routine",
+          "title": "03 / 每日、每周、每月的闭环",
+          "body": "**每日：选择、执行、闭环。** 打开今日视图，选择日期，只安排容量内的工作。`scheduled_on` 是该任务的工作日，`estimate_hours` 是在这一天预留的小时数。看板会与每日容量比较，默认 8 小时。这是计划估算，不是计时器。结束时留下成果链接、明确的等待条件或更新后的下一步。\n\n**每周：处理未完成承诺。** 打开周视图，检查逾期交付、即将到期的复查和等待任务。确认哪些还值得做，主动暂停、取消或重新安排。把同时激活的项目限制在能够完成的范围内。\n\n**每月：检查成果。** 打开月视图，用已完成的证据对照项目成果。把成功完成与取消、合并分开看；将有效方法提炼成可复用笔记，再链接到下一项工作。\n\n`due` 是交付期限，`review_on` 是下次跟进日期。目前一个任务只有一个安排日期，不支持跨多天的时间块排程。周期面板展示当前状态，也包含更早未关闭的承诺和执行中、等待中的工作；它不是历史快照。\n\n独立模式的日、周、月笔记目录、主页路径、时区和容量均可配置。独立周视图从周一开始。历史 PALXOS 编码不会决定 UCIT v2 任务是否活跃；应以明确的 PAWSC `status` 为准。"
+        },
+        {
+          "id": "calendar",
+          "title": "04 / 连接 New Calendar Suite",
+          "body": "启用两个插件，并打开 UCIT 设置中的 **连接 New Calendar Suite**。当前集成针对同由 Jason Shelter 编写的 **New Calendar Suite 1.4.5** 设计。\n\n- **共用周期笔记。** 日、周、月操作使用 NCS 的目录、文件名、模板及创建行为；周界线跟随 NCS 的 Moment 区域设置。未启用 NCS 时使用 UCIT 独立设置。\n- **NC 周期。** 可以打开 phase、month、season、year。UCIT 任务日期仍使用公历 `YYYY-MM-DD`，NC 周期范围由 NCS 计算。\n- **日历标记。** 红色表示期限或逾期，蓝色表示已安排工作，琥珀色表示复查，绿色表示成功完成。点表示存在此类事项，不代表精确数量；取消不会显示为绿色完成。\n- **从笔记进入行动。** 可从当前周期笔记打开对应看板，或创建该日期的任务。\n\n在阅读视图或渲染后的实时预览中使用以下代码块：\n\n````markdown\n```ucit\nperiod: week\ndate: 2027-01-04\nproject: DEMO-001\nshow_closed: false\n```\n````\n\n带日期的周期笔记可用 `period: auto`。明确指定时支持 `day`、`week`、`month`、`nc-phase`、`nc-month`、`nc-season`、`nc-year`。省略 `project` 即包含所有项目。自动识别会读取 NCS 属性和已配置的文件名；普通笔记可能需要明确填写周期与日期。\n\n启动时 UCIT 会重新连接已打开的日历窗格：位置保持不变，但显示月份可能回到当前月。标记缺失时运行 **UCIT Home: 连接 GC / NC 日历标记**。NCS 接口不兼容时会报错，不会另外生成重复的备用笔记。UCIT 自身不执行 Templater。"
+        },
+        {
+          "id": "fields",
+          "title": "05 / 字段与闭环规则",
+          "body": "| 字段 | 含义 |\n| --- | --- |\n| `ucit` / `parent` | 稳定编号 / 指向所属项目笔记的双链 |\n| `status` | `planned`、`active`、`waiting`、`suspended`、`closed` |\n| `next_action` / `acceptance` | 下一项可观察行动 / 完成的验收标准 |\n| `depends_on` | 前置任务编号，只有 `closed` + `done` 满足依赖 |\n| `scheduled_on` / `estimate_hours` | 安排工作日期 / 当日预留小时数 |\n| `due` / `review_on` | 交付期限 / 下次复查日期 |\n| `waiting_for` / `resume_when` | 等待条件 / 恢复条件 |\n| `evidence` / `resolution` | 成果或决策记录 / `done`、`cancelled`、`merged` |\n\n每次编辑都需要原因，并追加变更历史。编辑器会阻止过期覆盖、未知依赖、依赖环及冲突状态。不能关闭仍有未闭环子任务的项目，不能暂停仍有执行中子任务的项目，也不能撤销正在被执行中任务使用的已完成依赖。\n\n关闭要求有证据，但插件无法判断证据是否真实、是否达到验收标准。这仍然是复查中的人工判断。"
+        },
+        {
+          "id": "help",
+          "title": "06 / 排错与数据归属",
+          "body": "**看板没有内容？** 检查笔记是否位于 `projects/`，是否有 `ucit_version: 2`、有效的 `kind` 和唯一的 `ucit` 编号。普通笔记不会自动当作任务。\n\n**无法激活或关闭？** 按验证提示处理：先激活所属项目、把前置任务以 `done` 完成、补齐必需字段，或先处理未关闭的子任务。\n\n**周期范围不对？** 试用明确的 `period` 和 `date`，并检查 NCS 的周设置。源码模式显示代码块文字；阅读视图才会渲染面板。\n\n**提示编辑已过期？** 重新打开编辑器，加载最新笔记。跨设备和外部脚本操作时保持单一写入者；插件没有分布式事务锁。\n\nMarkdown 是工作台账。未知字段和正文会保留，但 YAML 排版与注释可能变化。迁移时保留 `data.json`，防止预留编号被重新使用。UCIT 不会执行 shell 命令、启动实验或运行自主调研。\n\n反馈问题时附上插件、Obsidian、NCS 版本和最小虚构示例。发布测试使用模拟 Obsidian API，尚未验证真实移动端渲染。"
+        },
+        {
+          "id": "updates",
+          "title": "07 / 版本与文档更新",
+          "body": "本页标明所对应的插件版本。指南源文件位于插件仓库的 `docs/usage.json`，同步到网站后形成经过预览检查的固定副本。网站不会读取你的 Obsidian 仓库。\n\n后续每次发布插件：更新三种语言的指南，运行文档检查与同步命令，部署并验证网站，再通过发布命令发布插件。发布命令会检查线上指南的版本和内容哈希，确保对应一致。具体命令见仓库维护指南。\n\n仅修正文档时，可使用同一同步与网站部署流程，无需改变插件二进制文件。"
+        }
+      ]
+    },
+    "fr": {
+      "title": "UCIT Home · Guide d’utilisation",
+      "summary": "Transformez vos notes de projet en engagements planifiés, réexaminés et clos avec des preuves.",
+      "labels": {
+        "eyebrow": "Obsidian / Jason Shelter",
+        "download": "Télécharger le plugin",
+        "source": "Code & signalements",
+        "contents": "Dans ce guide",
+        "version": "Version du plugin",
+        "updated": "Guide mis à jour",
+        "loop": "Une boucle qui se termine par une preuve",
+        "stateHint": "Ouvrez un état pour comprendre sa fonction et la prochaine étape.",
+        "copy": "Copier l’exemple",
+        "copied": "Copié",
+        "copyError": "Sélectionnez le code et copiez-le manuellement.",
+        "example": "Projet exemple",
+        "note": "L’interface du plugin est en chinois. Ce guide existe en trois langues."
+      },
+      "states": [
+        {
+          "code": "P",
+          "name": "Planifié",
+          "body": "Définissez le résultat, les critères d’acceptation et la prochaine action. Un plan reste un engagement potentiel, pas un travail déjà commencé."
+        },
+        {
+          "code": "A",
+          "name": "En cours",
+          "body": "Activez d’abord le projet parent. Les dépendances doivent être closes avec done. Gardez une prochaine action et une date de revue ; limitez les travaux simultanés."
+        },
+        {
+          "code": "W",
+          "name": "En attente",
+          "body": "Indiquez dans waiting_for qui ou quoi vous attendez. Gardez une prochaine action et review_on pour assurer le suivi."
+        },
+        {
+          "code": "S",
+          "name": "Suspendu",
+          "body": "Précisez dans resume_when la condition de reprise. La pause doit être choisie et réexaminée, sans laisser disparaître la tâche."
+        },
+        {
+          "code": "C",
+          "name": "Clos",
+          "body": "Joignez une preuve ou une décision. Choisissez done, cancelled ou merged. Seul done satisfait une dépendance ultérieure."
+        }
+      ],
+      "sections": [
+        {
+          "id": "install",
+          "title": "01 / Installation et mise à jour",
+          "body": "Nécessite **Obsidian 1.5.0 ou supérieur**. Téléchargez `ucit-home.zip` depuis la page des versions, extrayez le dossier `ucit-home` dans `.obsidian/plugins/` de votre coffre, puis activez **UCIT Home** dans les plugins communautaires. Le plugin ne figure pas encore dans le catalogue communautaire.\n\nPour une mise à jour, remplacez `main.js`, `manifest.json` et `styles.css`, conservez `data.json`, puis rechargez le plugin. Ce fichier conserve les réglages et les identifiants réservés.\n\nVous pouvez aussi ajouter `jasonshelter0/obsidian-ucit-home` dans BRAT. New Calendar Suite est facultatif. Aucun compte, service cloud ou clé d’IA n’est nécessaire."
+        },
+        {
+          "id": "start",
+          "title": "02 / Votre premier projet utile",
+          "body": "Commencez par un livrable concret. Créez `projects/DEMO-001/HOME.md` avec l’exemple ci-dessous. Remplacez les dates, l’objectif et le résultat attendus. UCIT indexe uniquement les notes Markdown sous `projects/` portant `ucit_version: 2` et `kind: project` ou `task`.\n\n```yaml\n---\nucit_version: 2\nkind: project\nucit: DEMO-001\narea: '[[Work]]'\nstatus: planned\ngoal: Build one useful prototype\noutcome: A working prototype with a demonstrated use case\nnext_action: Specify the first acceptance test\nreview_on: '2027-01-04'\nbudget: 4 hours this week\ntask_source: projects/DEMO-001/tasks\n---\n# Prototype\n```\n\n1. Lancez **UCIT Home: 打开今日主页** dans la palette de commandes pour ouvrir le tableau.\n2. Utilisez **调整 / 闭环** pour activer le projet. Renseignez objectif, résultat, budget, dossier des tâches, prochaine action et date de revue.\n3. Choisissez **＋ 子任务** pour créer une tâche. Définissez son action et ses critères d’acceptation avant de la planifier.\n4. Une tâche comme `DEMO-001-T001` reçoit son propre dossier sous `projects/DEMO-001/tasks/`. Conservez son identifiant lorsque son titre change.\n5. Activez la tâche, produisez le livrable, ajoutez une preuve et clôturez avec `resolution: done`.\n\nÉvitez de recopier les états dans chaque note quotidienne. Liez la tâche d’origine ou insérez un panneau UCIT dynamique."
+        },
+        {
+          "id": "routine",
+          "title": "03 / La boucle quotidienne, hebdomadaire et mensuelle",
+          "body": "**Chaque jour : choisir, exécuter, clôturer.** Ouvrez la vue du jour, choisissez une date et respectez votre capacité. `scheduled_on` désigne la date de travail ; `estimate_hours` réserve des heures pour cette date. Le tableau compare le total à votre capacité quotidienne, de 8 heures par défaut. Ce sont des estimations, pas un chronomètre. Terminez par un lien vers le livrable, une attente explicite ou une prochaine action révisée.\n\n**Chaque semaine : traiter les engagements ouverts.** Examinez les livraisons en retard, les revues à venir et les tâches en attente. Décidez ce qui mérite encore votre temps ; suspendez, annulez ou replanifiez délibérément. Limitez les projets actifs pour pouvoir les terminer.\n\n**Chaque mois : vérifier les résultats.** Comparez les preuves produites au résultat attendu de chaque projet. Distinguez réussite, annulation et fusion. Transformez les méthodes utiles en notes réutilisables liées au prochain projet.\n\n`due` est la date de livraison ; `review_on` est la date de suivi. Une tâche possède actuellement une seule date de travail, sans planification en blocs sur plusieurs jours. Les panneaux affichent l’état courant, y compris les engagements antérieurs ouverts et les éléments actifs ou en attente : ce ne sont pas des archives historiques.\n\nLes dossiers quotidiens, hebdomadaires et mensuels autonomes, la page d’accueil, le fuseau horaire et la capacité sont configurables. En mode autonome, la semaine commence le lundi. Les anciens codes PALXOS ne déterminent pas l’activité d’une tâche UCIT v2 : son `status` PAWSC explicite fait foi."
+        },
+        {
+          "id": "calendar",
+          "title": "04 / New Calendar Suite",
+          "body": "Activez les deux plugins et le réglage UCIT **连接 New Calendar Suite**. L’intégration est conçue pour **New Calendar Suite 1.4.5**, également créé par Jason Shelter.\n\n- **Des notes périodiques communes.** Les actions jour, semaine et mois suivent les dossiers, noms, modèles et règles de création NCS. Les semaines suivent sa configuration régionale Moment. Sans NCS, UCIT utilise ses réglages autonomes.\n- **Périodes NC.** Ouvrez une phase, un mois, une saison ou une année. Les dates des tâches restent grégoriennes, au format `YYYY-MM-DD` ; NCS fournit les limites des périodes NC.\n- **Repères du calendrier.** Rouge : échéance ou retard ; bleu : travail prévu ; ambre : revue ; vert : clôture réussie. Un point signale une catégorie, pas un nombre exact. Une annulation n’est pas une réussite verte.\n- **De la note à l’action.** Des commandes ouvrent le tableau ou créent une tâche pour la date de la note périodique courante.\n\nInsérez ce bloc en mode Lecture ou dans un bloc rendu en aperçu en direct :\n\n````markdown\n```ucit\nperiod: week\ndate: 2027-01-04\nproject: DEMO-001\nshow_closed: false\n```\n````\n\nUtilisez `period: auto` dans une note périodique datée. Périodes explicites : `day`, `week`, `month`, `nc-phase`, `nc-month`, `nc-season`, `nc-year`. Omettez `project` pour inclure tous les projets. La détection lit les propriétés NCS et les noms configurés ; une note ordinaire peut nécessiter une période et une date explicites.\n\nUCIT reconnecte les panneaux de calendrier au démarrage. Leur position est conservée, mais le mois affiché peut être réinitialisé. Lancez **UCIT Home: 连接 GC / NC 日历标记** si les repères manquent. Une interface NCS incompatible produit une erreur au lieu de créer une note de secours en double. UCIT n’exécute pas Templater lui-même."
+        },
+        {
+          "id": "fields",
+          "title": "05 / Champs et règles de clôture",
+          "body": "| Champ | Signification |\n| --- | --- |\n| `ucit` / `parent` | Identifiant stable / lien wiki vers le projet parent d’une tâche |\n| `status` | `planned`, `active`, `waiting`, `suspended`, `closed` |\n| `next_action` / `acceptance` | Prochaine action observable / critère de réussite |\n| `depends_on` | Identifiants préalables ; seuls `closed` + `done` les satisfont |\n| `scheduled_on` / `estimate_hours` | Date de travail / heures réservées à cette date |\n| `due` / `review_on` | Échéance de livraison / prochaine revue |\n| `waiting_for` / `resume_when` | Condition d’attente / condition de reprise |\n| `evidence` / `resolution` | Livrable ou décision / `done`, `cancelled`, `merged` |\n\nChaque modification exige une raison et ajoute un historique. L’éditeur bloque les écrasements périmés, les dépendances inconnues, les cycles et les états contradictoires. Il interdit de clore un projet ayant des tâches ouvertes, de suspendre un projet ayant des tâches actives ou d’invalider un préalable achevé dont dépend un travail actif.\n\nUne preuve est obligatoire pour clôturer, mais le plugin ne peut pas juger sa véracité ni sa conformité aux critères d’acceptation. Cette appréciation relève de votre revue."
+        },
+        {
+          "id": "help",
+          "title": "06 / Dépannage et maîtrise des données",
+          "body": "**Le tableau est vide ?** Vérifiez le dossier `projects/`, `ucit_version: 2`, un `kind` valide et un identifiant `ucit` unique. Les notes ordinaires ne deviennent pas automatiquement des tâches.\n\n**Activation ou clôture impossible ?** Suivez le message de validation : activez le parent, terminez les préalables avec `done`, complétez les champs ou traitez les tâches encore ouvertes.\n\n**La période est incorrecte ?** Essayez des valeurs explicites pour `period` et `date`, puis vérifiez les réglages de semaine NCS. Le mode Source affiche le texte du bloc ; le mode Lecture affiche le panneau.\n\n**Une modification est périmée ?** Rouvrez l’éditeur pour charger la note courante. Utilisez un seul rédacteur à la fois entre appareils et scripts externes ; il n’existe pas de verrou transactionnel distribué.\n\nVos fichiers Markdown restent le registre. Les champs inconnus et le corps des notes sont conservés, mais la mise en forme YAML et les commentaires peuvent changer. Conservez `data.json` lors d’une migration afin de préserver les identifiants réservés. UCIT n’exécute pas de commandes shell, ne lance pas d’expériences et ne mène pas de recherche autonome.\n\nSignalez les problèmes reproductibles avec les versions du plugin, d’Obsidian et de NCS, ainsi qu’un exemple fictif minimal. Les tests utilisent des API Obsidian simulées ; le rendu mobile réel n’est pas encore vérifié."
+        },
+        {
+          "id": "updates",
+          "title": "07 / Versions et documentation",
+          "body": "Cette page indique la version du plugin documentée. Son contenu provient de `docs/usage.json` dans le dépôt du plugin, synchronisé ici sous forme d’une copie figée et vérifiée en aperçu. Le site ne lit jamais votre coffre.\n\nPour chaque nouvelle version : mettez à jour les trois langues, exécutez les contrôles et la synchronisation, déployez et vérifiez le site, puis publiez le plugin avec la commande de publication. Celle-ci vérifie la version et l’empreinte du guide en ligne. Le guide de maintenance du dépôt détaille les commandes.\n\nUne correction de documentation suit le même processus de synchronisation et de déploiement, sans modifier le binaire du plugin."
+        }
+      ]
+    }
+  }
+}

@@ -19,8 +19,9 @@ jobs:
       - name: Verify version
         run: node -e 'if (process.env.GITHUB_REF_NAME !== require("./manifest.json").version) process.exit(1)'
       - run: npm run package
+      - run: npm run docs:live
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/main.js dist/manifest.json dist/styles.css dist/ucit-home.zip dist/SHA256SUMS --verify-tag --title "UCIT Home $GITHUB_REF_NAME" --notes-file CHANGELOG.md
+          gh release create "$GITHUB_REF_NAME" dist/main.js dist/manifest.json dist/styles.css dist/ucit-home.zip dist/usage.json dist/SHA256SUMS --verify-tag --title "UCIT Home $GITHUB_REF_NAME" --notes-file CHANGELOG.md

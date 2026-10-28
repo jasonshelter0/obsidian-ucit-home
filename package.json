@@ -6,13 +6,19 @@
   "author": "Jason Shelter",
   "license": "MIT",
   "scripts": {
-    "test": "node tests/plugin.test.cjs",
+    "test": "node --test tests/plugin.test.cjs tests/docs.test.mjs",
     "check": "node --check main.js",
-    "package": "python3 scripts/package.py"
+    "package": "python3 scripts/package.py",
+    "docs:check": "node scripts/docs.mjs check",
+    "docs:sync": "node scripts/docs.mjs sync",
+    "docs:live": "node scripts/docs.mjs live",
+    "release:publish": "node scripts/publish-release.mjs"
   },
   "devDependencies": {
     "js-yaml": "4.1.1",
     "moment": "2.30.1"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
