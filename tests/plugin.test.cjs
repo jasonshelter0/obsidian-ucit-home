@@ -245,3 +245,53 @@ test('current managed vault data satisfies plugin invariants (read only)',{skip:
  assert.equal(h.collect(app).length,records.length);
  for(const item of records)assert.deepEqual(h.parseNote(texts.get(item.file.path)).data,item.kind?fixture.find(x=>x.data.ucit===item.ucit).data:{});
 });
+
+test('one-line project capture validates title, owner and deadline before any write',async()=>{
+ const {p,files}=plugin([]);
+ for(const line of ['', '../escape | MiniEnter','Title | due:2026-02-30','Title | MiniEnter | RefCom','Title | unknown:value','Title || due:2026-11-30'])await assert.rejects(p.createProject(line));
+ assert.equal(files.size,0);assert.equal(p.saved,undefined);
+ const d=h.parseProjectLine('整理计划 | RefCom | due:2026-11-30');
+ assert.equal(d.area,'[[RefCom]]');assert.equal(d.due,'2026-11-30');
+ assert.equal(h.parseProjectLine('Title','MiniHome').area,'[[MiniHome]]');
+});
+test('project creation serializes IDs, reserves old folders and keeps captured projects planned',async()=>{
+ const {p,files,texts}=plugin([]);files.set('projects/PRJ-009 old',{path:'projects/PRJ-009 old'});
+ const created=await Promise.all([p.createProject('First | MiniEnter'),p.createProject('Second | RefCom | due:2026-11-30')]);
+ assert.match(created[0].path,/PRJ-010 First\/HOME.md$/);assert.match(created[1].path,/PRJ-011 Second\/HOME.md$/);
+ const d=h.parseNote(texts.get(created[1].path)).data;assert.equal(d.status,'planned');assert.equal(d.review_on,p.now());assert.equal(d.outcome,'');assert.equal(d.due,'2026-11-30');assert.equal(d.due_type,'internal_checkpoint');
+ assert.ok(files.has(d.task_source));assert.equal(p.saved.counters.__projects,11);
+ const records=await h.readRecords(p.app),item=records.find(r=>r.ucit===d.ucit);
+ assert.throws(()=>h.buildUpdate(item,{status:'active',reason:'start',next_action:'Make prototype'},records,p.now()),/goal/);
+ const raw=h.buildUpdate(item,{status:'active',reason:'defined scope',next_action:'Make prototype',goal:'Useful demo',outcome:'Accepted demo',budget:'4h'},records,p.now());
+ assert.equal(h.parseNote(raw).data.status,'active');assert.match(raw,/defined scope/);
+});
+test('failed project creation retains reservation and a retry never reuses its ID',async()=>{
+ const {p}=plugin([]);const create=p.app.vault.create;p.app.vault.create=async()=>{throw Error('disk failure');};
+ await assert.rejects(p.createProject('First'),/disk failure/);assert.equal(p.saved.counters.__projects,1);
+ p.app.vault.create=create;assert.match((await p.createProject('First')).path,/PRJ-002/);
+});
+test('project modal supports Enter, ignores IME composition and offers owner before creation',async()=>{
+ const {p}=plugin([]);let calls=0;p.createProject=async()=>{calls++;return {path:'projects/PRJ-001/HOME.md'};};
+ const modal=new h.ProjectModal(p);modal.onOpen();const input=modal.contentEl.all().find(e=>e.placeholder?.startsWith('Build my portfolio'));
+ assert.ok(input);input.events.keydown({key:'Enter',isComposing:true});assert.equal(calls,0);
+ input.events.keydown({key:'Enter',isComposing:false,preventDefault(){}});await new Promise(r=>setTimeout(r,0));assert.equal(calls,1);
+});
+test('GC quarter/year periods handle leap years and legacy filename date fallback',()=>{
+ assert.equal(h.period('2028-02-29','quarter').end,'2028-03-31');assert.equal(h.period('2026-11-10','year').start,'2026-01-01');
+ const {app}=fakeApp([]);app.metadataCache.getFileCache=()=>({frontmatter:{'gc-type':'quarterly',date:'2026-Season'}});
+ assert.equal(h.detectPeriod(app,file('areas/periodicNotes/gc-quarterly/2026-Q4.md')).anchor,'2026-10-01');
+ app.metadataCache.getFileCache=()=>({frontmatter:{'gc-type':'yearly',date:'{{nc-year}}'}});
+ assert.equal(h.detectPeriod(app,file('areas/periodicNotes/gc-yearly/2026.md')).anchor,'2026-01-01');
+});
+test('GC quarter/year navigation delegates to NCS and respects disabled periods',async()=>{
+ const {p}=plugin([]),seen=[];p.app.plugins={getPlugin:()=>({options:{quarterly:{enabled:true},yearly:{enabled:true}}})};
+ p.calendarView=async()=>({openOrCreateGCQuarter:async d=>seen.push('Q'+d.format('YYYY-MM-DD')),openOrCreateGCYear:async d=>seen.push('Y'+d.format('YYYY-MM-DD'))});
+ await p.openCalendarNote('quarter','2026-11-10');await p.openCalendarNote('year','2026-11-10');assert.equal(seen.join(','),'Q2026-11-10,Y2026-11-10');
+ p.app.plugins.getPlugin=()=>({options:{quarterly:{enabled:false}}});await assert.rejects(p.openCalendarNote('quarter','2026-11-10'),/启用/);
+});
+test('rescheduling changes daily capacity but preserves deadline, identity and closure state',()=>{
+ const p=project(),t=task(1,'planned',{due:'2026-11-10',scheduled_on:'2026-10-30',estimate_hours:2});
+ const data=h.parseNote(h.buildUpdate(t,{scheduled_on:'2026-11-01',reason:'capacity moved'},[p,t],'2026-10-30')).data;
+ assert.equal(data.ucit,t.ucit);assert.equal(data.status,t.status);assert.equal(data.due,t.due);
+ const idx=h.workloadIndex([{...data,file:t.file}],'2026-10-30');assert.equal(idx.get('2026-11-01').hours,2);assert.equal(idx.has('2026-10-30'),false);
+});

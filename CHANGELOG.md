@@ -1,3 +1,11 @@
+## 0.4.0 — 2026-10-30
+
+- Add one-line project capture from command palette/dashboard, optional owner/deadline, reserved PRJ identifiers and independent folders.
+- Keep captured projects planned; edit goal, outcome and budget before activation. Preserve creation reservations across failures.
+- Support GC quarter/year navigation, period detection and live panels alongside NC periods.
+- Fix the usage-guide command callback and show captured project titles on cards.
+- Document shared daily/weekly planning, calendar scales and evidence-preserving rescheduling in all three guide languages.
+
 # Changelog
 
 ## 0.3.0 — 2026-10-28

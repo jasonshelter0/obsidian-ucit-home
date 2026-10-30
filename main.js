@@ -1,7 +1,7 @@
 const {Plugin, ItemView, Notice, Modal, Setting, PluginSettingTab, MarkdownRenderChild, parseYaml, stringifyYaml} = require('obsidian');
 const TYPE = 'ucit-home-view';
 const LABELS = {planned:'P 待计划', active:'A 推进中', waiting:'W 等待', suspended:'S 暂停', closed:'C 已关闭'};
-const DEFAULTS = {openOnStartup:true, timezone:'Asia/Shanghai', dailyHours:8, hideClosed:false, calendarIntegration:true, calendarMarkers:true, dailyFolder:'areas/periodicNotes/daily', weeklyFolder:'areas/periodicNotes/weekly', monthlyFolder:'areas/periodicNotes/gc-monthly', homeNote:'areas/things/UCIT 今日主页', counters:{}};
+const DEFAULTS = {openOnStartup:true, timezone:'Asia/Shanghai', dailyHours:8, hideClosed:false, calendarIntegration:true, calendarMarkers:true, dailyFolder:'areas/periodicNotes/daily', weeklyFolder:'areas/periodicNotes/weekly', monthlyFolder:'areas/periodicNotes/gc-monthly', quarterlyFolder:'areas/periodicNotes/gc-quarterly', yearlyFolder:'areas/periodicNotes/gc-yearly', projectArea:'MiniEnter', homeNote:'areas/things/UCIT 今日主页', counters:{}};
 const GUIDE = 'utilities/ucit/UCIT 插件使用指南';
 const array = v => Array.isArray(v) ? v : [];
 const day = v => v instanceof Date ? v.toISOString().slice(0,10) : String(v || '').slice(0,10);
@@ -25,11 +25,33 @@ function period(value,mode) {
   const num=1+Math.round((Date.parse(start)-Date.parse(first))/604800000);
   return {start,end:addDays(start,6),key:year+'-W'+String(num).padStart(2,'0')};
  }
+ if(mode==='quarter' || mode==='year') {
+  const year=d.getUTCFullYear(),month=mode==='year'?0:Math.floor(d.getUTCMonth()/3)*3;
+  return {start:day(new Date(Date.UTC(year,month,1,12))),end:day(new Date(Date.UTC(year,month+(mode==='year'?12:3),0,12))),key:mode==='year'?String(year):year+'-Q'+(month/3+1)};
+ }
  if(mode==='month') {
   const end=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0,12));
   return {start:value.slice(0,7)+'-01',end:day(end),key:value.slice(0,7)};
  }
  return {start:value,end:value,key:value};
+}
+function projectTitle(title) {
+ required(title,'请填写项目名称');
+ title=String(title).trim();
+ if(title.length>100 || /[\x00-\x1f\\/:*?"<>|#\[\]]/.test(title) || /[. ]$/.test(title))throw new Error('名称最长 100 字，不能含路径、链接或系统保留符号');
+ return title;
+}
+function parseProjectLine(line,defaultArea='MiniEnter') {
+ const parts=String(line||'').split('|').map(x=>x.trim());
+ const title=projectTitle(parts.shift());let area=defaultArea,due='',ownerSeen=false;
+ for(const part of parts) {
+  if(!part)throw new Error('分隔符之间不能为空');
+  if(part.startsWith('due:')) {if(due)throw new Error('due 重复');due=part.slice(4).trim();if(!validDate(due))throw new Error('due 日期无效，使用 YYYY-MM-DD');}
+  else {if(ownerSeen || part.includes(':'))throw new Error('格式：名称 | 主责 | due:YYYY-MM-DD');area=part;ownerSeen=true;}
+ }
+ area=String(area||'').trim();required(area,'请指定主责');
+ if(!/^[\p{L}\p{N}_ -]+$/u.test(area))throw new Error('主责使用笔记名称，例如 MiniEnter 或 RefCom，不含双链符号');
+ return {title,area:'[['+area+']]',due};
 }
 function parseNote(text) {
  const m=/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
@@ -109,7 +131,8 @@ function validateRecord(d,records) {
 function buildUpdate(item,input,records,now) {
  required(input.reason,'请写明本次决定或调整原因');
  const {file,raw,...d}=item;
- for(const key of ['status','next_action','acceptance','due','review_on','scheduled_on','waiting_for','resume_when']) {
+ for(const key of ['status','goal','outcome','budget','next_action','acceptance','due','review_on','scheduled_on','waiting_for','resume_when']) {
+  if(['goal','outcome','budget'].includes(key) && d.kind!=='project')continue;
   if(Object.prototype.hasOwnProperty.call(input,key)) { if(input[key]) d[key]=input[key]; else delete d[key]; }
  }
  if(Object.prototype.hasOwnProperty.call(input,'estimate_hours')) { if(input.estimate_hours==='') delete d.estimate_hours; else d.estimate_hours=Number(input.estimate_hours); }
@@ -123,7 +146,7 @@ function buildUpdate(item,input,records,now) {
  const updated={...d,file};
  validateRecord(updated,records.map(x=>x.ucit===d.ucit ? updated : x));
  const body=parseNote(raw).body;
- const changes=['next_action','acceptance','depends_on','due','review_on','scheduled_on','estimate_hours','waiting_for','resume_when','resolution','evidence']
+ const changes=['goal','outcome','budget','next_action','acceptance','depends_on','due','review_on','scheduled_on','estimate_hours','waiting_for','resume_when','resolution','evidence']
   .filter(k=>JSON.stringify(item[k])!==JSON.stringify(d[k]))
   .map(k=>'- '+k+'：'+JSON.stringify(item[k]??null)+' → '+JSON.stringify(d[k]??null)).join('\n');
  const log='\n\n### UCIT 决定 '+new Date().toISOString()+'\n\n'+item.status+' → '+d.status+'：'+input.reason.trim()+'\n'+(changes?'\n'+changes+'\n':'')+(array(d.evidence).length?'\n证据或决定记录：'+d.evidence.join('；')+'\n':'');
@@ -154,7 +177,7 @@ function button(parent,label,callback,cls) {
 // The bridge uses the v1.4.5 calendar:open source contract and feature-detected view methods.
 const CALENDAR_ID = 'new-calendar-suite';
 const NC_MODES = ['nc-phase','nc-month','nc-season','nc-year'];
-const CALENDAR_KEYS = {day:'daily',week:'weekly',month:'monthly','nc-phase':'ncPhase','nc-month':'ncMonth','nc-season':'ncSeason','nc-year':'ncYear'};
+const CALENDAR_KEYS = {day:'daily',week:'weekly',month:'monthly',quarter:'quarterly',year:'yearly','nc-phase':'ncPhase','nc-month':'ncMonth','nc-season':'ncSeason','nc-year':'ncYear'};
 function calendarPlugin(app) { return app.plugins?.getPlugin?.(CALENDAR_ID) || null; }
 function calendarGlobals() { return typeof window==='undefined' ? {} : {moment:window.moment,dates:window.NCDates,notes:window.NCNotes}; }
 function suiteRange(app,anchor,mode,enabled=true) {
@@ -201,7 +224,7 @@ function detectPeriod(app,file,config={}) {
  const fm=app.metadataCache.getFileCache(file)?.frontmatter||{};
  const suite=calendarPlugin(app);const options=suite?.options||suite?.settings||{};
  const {moment,dates}=calendarGlobals();
- const aliases={daily:'day',weekly:'week',monthly:'month',day:'day',week:'week',month:'month'};
+ const aliases={daily:'day',weekly:'week',monthly:'month',quarterly:'quarter',yearly:'year',quarter:'quarter',year:'year',day:'day',week:'week',month:'month'};
  let mode=config.period==='auto'?null:config.period;
  mode=mode || aliases[fm['gc-type']] || (fm['nc-type'] ? String(fm['nc-type']).startsWith('nc-') ? fm['nc-type'] : 'nc-'+fm['nc-type'] : null);
  let anchor=day(config.date || fm['gc-date'] || fm.date);
@@ -212,13 +235,15 @@ function detectPeriod(app,file,config={}) {
   const parsed=dates.parseFilename(file.basename,options[key]?.format||formats[mode],mode,fm);
   if(parsed) {const [start]=dates.getPeriodRange(mode,parsed.ny,parsed.nm,mode==='nc-phase'?parsed.phase:mode==='nc-season'?parsed.season:undefined);return {mode,anchor:start.format('YYYY-MM-DD')};}
  }
- const formats={day:options.daily?.format||'YYYY-MM-DD',week:options.weekly?.format||'gggg-[W]ww',month:options.monthly?.format||'YYYY-MM'};
- if(moment)for(const kind of mode?[mode]:['day','week','month']) {
+ const formats={day:options.daily?.format||'YYYY-MM-DD',week:options.weekly?.format||'gggg-[W]ww',month:options.monthly?.format||'YYYY-MM',quarter:(options.quarterly?.format||'YYYY-[Q]Q').replace('[Season]','[Q]Q'),year:options.yearly?.format||'YYYY'};
+ if(moment)for(const kind of mode?[mode]:['day','week','month','quarter','year']) {
   if(!formats[kind])continue;
   const parsed=moment(file.basename,formats[kind],true);
   if(parsed.isValid())return {mode:kind,anchor:parsed.format('YYYY-MM-DD')};
  }
  // Standalone default filenames, without needing Moment or the calendar plugin.
+ if((!mode || mode==='quarter') && /^\d{4}-Q[1-4]$/.test(file.basename))return {mode:'quarter',anchor:file.basename.slice(0,4)+'-'+String((Number(file.basename.at(-1))-1)*3+1).padStart(2,'0')+'-01'};
+ if((!mode || mode==='year') && /^\d{4}$/.test(file.basename))return {mode:'year',anchor:file.basename+'-01-01'};
  if((!mode || mode==='day') && validDate(file.basename))return {mode:'day',anchor:file.basename};
  if((!mode || mode==='month') && /^\d{4}-\d{2}$/.test(file.basename) && validDate(file.basename+'-01'))return {mode:'month',anchor:file.basename+'-01'};
  if((!mode || mode==='week') && /^\d{4}-W\d{2}$/.test(file.basename)) {
@@ -241,7 +266,7 @@ class UCITPlanBlock extends MarkdownRenderChild {
   const el=this.containerEl;el.empty();el.addClass('ucit-plan-block');
   try {
    const {mode,anchor}=detectPeriod(this.app,this.file,this.config);
-   if(!['day','week','month',...NC_MODES].includes(mode))throw new Error('不支持的 period');
+   if(!['day','week','month','quarter','year',...NC_MODES].includes(mode))throw new Error('不支持的 period');
    const range=this.plugin.range(anchor,mode);const records=collect(this.app);
    const tasks=filteredTasks(records,{horizon:mode,range,hideClosed:this.config.show_closed!==true,project:this.config.project||''},anchor);
    el.createEl('h3',{text:'UCIT · '+range.start+' — '+range.end});
@@ -266,7 +291,7 @@ class WorkModal extends Modal {
    let item=this.item;
    if(item) { item=records.find(x=>x.file.path===item.file.path); if(!item) throw new Error('记录已移除，请刷新'); this.item=item; }
    this.values=item ? {
-    status:item.status,next_action:item.next_action||'',acceptance:item.acceptance||'',due:day(item.due),review_on:day(item.review_on),
+    goal:item.goal||'',outcome:item.outcome||'',budget:item.budget||'',status:item.status,next_action:item.next_action||'',acceptance:item.acceptance||'',due:day(item.due),review_on:day(item.review_on),
     scheduled_on:day(item.scheduled_on),estimate_hours:item.estimate_hours??'',waiting_for:item.waiting_for||'',resume_when:item.resume_when||'',
     resolution:item.resolution||'done',evidence:array(item.evidence).join('\n'),depends_on:array(item.depends_on).join('\n'),reason:''
    } : {project:this.projectId,title:'',next_action:'',acceptance:'',due:'',review_on:this.scheduled||this.plugin.now(),scheduled_on:this.scheduled,estimate_hours:'',depends_on:''};
@@ -275,11 +300,12 @@ class WorkModal extends Modal {
     const ps=records.filter(x=>x.kind==='project' && x.status!=='closed');
     if(!ps.length) throw new Error('先建立一个 UCIT v2 项目，再添加任务');
     if(!ps.some(x=>x.ucit===v.project)) v.project=ps[0].ucit;
-    new Setting(el).setName('归属项目').addDropdown(c=>{for(const p of ps)c.addOption(p.ucit,p.file.basename);c.setValue(v.project).onChange(x=>v.project=x);});
+    new Setting(el).setName('归属项目').addDropdown(c=>{for(const p of ps)c.addOption(p.ucit,p.title||p.file.basename);c.setValue(v.project).onChange(x=>v.project=x);});
     this.field('title','任务名称');
    } else {
     new Setting(el).setName('PAWSC 状态').addDropdown(c=>{for(const [k,label] of Object.entries(LABELS))c.addOption(k,label);c.setValue(v.status).onChange(x=>{v.status=x;this.showConditions();});});
    }
+   if(item?.kind==='project') {this.field('goal','项目目标',true);this.field('outcome','可验收成果',true);this.field('budget','投入预算',true);}
    this.field('next_action','下一步',true);
    if(!item || item.kind==='task') this.field('acceptance','验收条件',true);
    this.field('depends_on','依赖编号（换行或逗号分隔，可空）',true);
@@ -320,6 +346,23 @@ class WorkModal extends Modal {
   this.closeRow.settingEl.hidden=this.values.status!=='closed';
  }
 }
+class ProjectModal extends Modal {
+ constructor(plugin){super(plugin.app);this.plugin=plugin;}
+ onOpen(){
+  const el=this.contentEl;el.empty();el.addClass('ucit-form');el.createEl('h2',{text:'一行新建项目'});
+  el.createEl('p',{text:'名称 | 主责 | due:YYYY-MM-DD；主责和日期可省略。仅名称时使用下方默认主责。创建为 P，补齐成果、预算与下一步后再激活。'});
+  let line='',area=this.plugin.settings.projectArea||'MiniEnter',busy=false;
+  new Setting(el).setName('默认主责').addText(c=>c.setValue(area).onChange(v=>area=v));
+  const error=el.createEl('p',{cls:'ucit-warning',attr:{role:'alert'}});
+  const submit=async()=>{
+   if(busy)return;busy=true;save.disabled=true;error.setText('');
+   try {const file=await this.plugin.createProject(line,area);this.close();this.plugin.refresh();await this.app.workspace.openLinkText(file.path,'',false);new Notice('项目已加入 P；补齐成果后再激活');}
+   catch(e){error.setText(e.message);}finally{busy=false;save.disabled=false;}
+  };
+  new Setting(el).setName('项目').addText(c=>{c.setValue('').onChange(v=>line=v);c.inputEl.placeholder='Build my portfolio | MiniEnter | due:2026-11-30';c.inputEl.addEventListener('keydown',e=>{if(e.key==='Enter' && !e.isComposing){e.preventDefault();void submit();}});});
+  const save=button(el,'创建项目',submit,'mod-cta');button(el,'取消',()=>this.close());
+ }
+}
 class UCITSettings extends PluginSettingTab {
  constructor(app,plugin){super(app,plugin);this.plugin=plugin;}
  display(){
@@ -330,7 +373,7 @@ class UCITSettings extends PluginSettingTab {
   new Setting(el).setName('时区').setDesc('例如 Asia/Shanghai；离开输入框后保存有效时区。').addText(c=>{c.setValue(this.plugin.settings.timezone);c.inputEl.addEventListener('change',async()=>{try{today(c.getValue());this.plugin.settings.timezone=c.getValue();await this.plugin.saveSettings();this.plugin.refresh();}catch{new Notice('无效时区');}});});
   new Setting(el).setName('连接 New Calendar Suite').setDesc('使用日历的模板、路径与周界；NC 日期仍映射到公历任务日期。').addToggle(c=>c.setValue(this.plugin.settings.calendarIntegration).onChange(async v=>{this.plugin.settings.calendarIntegration=v;await this.plugin.saveSettings();this.plugin.refresh();}));
   new Setting(el).setName('日历显示 UCIT 标记').addToggle(c=>c.setValue(this.plugin.settings.calendarMarkers).onChange(async v=>{this.plugin.settings.calendarMarkers=v;await this.plugin.saveSettings();this.plugin.refresh();}));
-  for(const [key,label] of [['dailyFolder','独立模式日计划文件夹'],['weeklyFolder','独立模式周计划文件夹'],['monthlyFolder','独立模式月计划文件夹'],['homeNote','文字主页路径']])new Setting(el).setName(label).addText(c=>c.setValue(this.plugin.settings[key]).onChange(async v=>{this.plugin.settings[key]=v;await this.plugin.saveSettings();}));
+  for(const [key,label] of [['dailyFolder','独立模式日计划文件夹'],['weeklyFolder','独立模式周计划文件夹'],['monthlyFolder','独立模式月计划文件夹'],['quarterlyFolder','独立模式季计划文件夹'],['yearlyFolder','独立模式年计划文件夹'],['projectArea','新项目默认主责（笔记名称）'],['homeNote','文字主页路径']])new Setting(el).setName(label).addText(c=>c.setValue(this.plugin.settings[key]).onChange(async v=>{this.plugin.settings[key]=v;await this.plugin.saveSettings();}));
   button(el,'重新连接日历标记',()=>this.plugin.reconnectCalendars());
   button(el,'打开使用指南',()=>this.plugin.openGuide());
  }
@@ -347,8 +390,9 @@ class UCITView extends ItemView {
   el.createEl('h1',{text:'UCIT · '+now});
   el.createEl('p',{text:'任务笔记是主账 · 计划 → 推进 → 证据 → 验收 → 复用',cls:'ucit-subtitle'});
   const nav=el.createDiv({cls:'ucit-nav'});
+  button(nav,'＋ 新项目',()=>new ProjectModal(this.plugin).open(),'mod-cta');
   button(nav,'＋ 新任务',()=>new WorkModal(this.plugin,null,this.filters.project,now).open(),'mod-cta');
-  for(const [mode,name] of [['day','今日计划'],['week','本周计划'],['month','本月计划']]) button(nav,name,()=>this.plugin.openPeriod(mode,now));
+  for(const [mode,name] of [['day','今日计划'],['week','本周计划'],['month','本月计划'],['quarter','本季计划'],['year','本年计划']]) button(nav,name,()=>this.plugin.openPeriod(mode,now));
   button(nav,'文字主页',()=>this.app.workspace.openLinkText(this.plugin.settings.homeNote,'',false));
   button(nav,'使用指南',()=>this.plugin.openGuide());
   button(nav,'刷新',()=>this.render());
@@ -368,7 +412,7 @@ class UCITView extends ItemView {
    const input=wrap.createEl('select');for(const [value,text] of options)input.createEl('option',{value,text});input.value=this.filters[key];
    input.addEventListener('change',()=>{this.filters[key]=input.value;this.renderBody(data,now);});
   };
-  select('范围','horizon',[['all','全部'],['day','今日'],['week','本周'],['month','本月'],...(this.plugin.calendarEnabled()?[["nc-phase","NC 阶段"],["nc-month","NC 月"],["nc-season","NC 季"],["nc-year","NC 年"]]:[])]);
+  select('范围','horizon',[['all','全部'],['day','今日'],['week','本周'],['month','本月'],['quarter','本季'],['year','本年'],...(this.plugin.calendarEnabled()?[["nc-phase","NC 阶段"],["nc-month","NC 月"],["nc-season","NC 季"],["nc-year","NC 年"]]:[])]);
   select('项目','project',[['','全部项目'],...data.filter(x=>x.kind==='project').map(x=>[x.ucit,x.ucit+' '+x.file.basename.replace(x.ucit,'').trim()])]);
   select('主责','area',[['','全部主责'],...[...new Set(data.map(x=>x.area).filter(Boolean))].map(x=>[x,target(x)])]);
   select('状态','status',[['','全部状态'],...Object.entries(LABELS)]);
@@ -425,7 +469,7 @@ class UCITView extends ItemView {
  }
  card(parent,item,records,now){
   const c=parent.createDiv({cls:'ucit-card ucit-'+item.status});
-  const a=c.createEl('a',{text:item.file.basename,href:'#'});a.addEventListener('click',e=>{e.preventDefault();this.app.workspace.openLinkText(item.file.path,'',false);});
+  const a=c.createEl('a',{text:item.title||item.file.basename,href:'#'});a.addEventListener('click',e=>{e.preventDefault();this.app.workspace.openLinkText(item.file.path,'',false);});
   c.createDiv({text:(LABELS[item.status]||item.status)+' · '+target(item.area),cls:'ucit-meta'});
   const dates=[['scheduled_on','安排'],['due','目标'],['review_on','复查']].filter(([k])=>item[k]);
   for(const [k,label] of dates)c.createDiv({text:label+'：'+day(item[k])+(item.status!=='closed' && day(item[k])<now?' · 已过日期':''),cls:'ucit-meta'});
@@ -468,12 +512,13 @@ class UCITHome extends Plugin {
   this.addSettingTab(new UCITSettings(this.app,this));
   this.addRibbonIcon('layout-dashboard','UCIT 今日主页',()=>this.openHome());
   this.addCommand({id:'open-home',name:'打开今日主页',callback:()=>this.openHome()});
-  for(const [mode,id,label] of [['day','open-today','打开今日计划'],['week','open-week','打开本周计划'],['month','open-month','打开本月计划']])this.addCommand({id,name:label,callback:()=>this.openPeriod(mode).catch(e=>new Notice(e.message))});
+  for(const [mode,id,label] of [['day','open-today','打开今日计划'],['week','open-week','打开本周计划'],['month','open-month','打开本月计划'],['quarter','open-quarter','打开本季计划'],['year','open-year','打开本年计划']])this.addCommand({id,name:label,callback:()=>this.openPeriod(mode).catch(e=>new Notice(e.message))});
+  this.addCommand({id:'new-project',name:'一行新建项目',callback:()=>new ProjectModal(this).open()});
   this.addCommand({id:'new-task',name:'新建任务',callback:()=>new WorkModal(this).open()});
   this.addCommand({id:'edit-current',name:'调整当前任务或项目',checkCallback:checking=>{
    const file=this.app.workspace.getActiveFile();const item=collect(this.app).find(x=>x.file.path===file?.path);if(!item)return false;if(!checking)new WorkModal(this,item).open();return true;
   }});
-  this.addCommand({id:'open-guide',name:'打开使用指南',callback:()=>this.plugin.openGuide()});
+  this.addCommand({id:'open-guide',name:'打开使用指南',callback:()=>this.openGuide()});
   let timer;
   const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>this.refresh(),300);};
   this.register(()=>clearTimeout(timer));
@@ -533,7 +578,7 @@ class UCITHome extends Plugin {
    return this.app.workspace.openLinkText(file.path,'',false);
   }
   const view=await this.calendarView('gc-calendar');
-  const method={day:'openOrCreateDailyNote',week:'openOrCreateWeeklyNote',month:'openOrCreateGCMonth'}[mode];
+  const method={day:'openOrCreateDailyNote',week:'openOrCreateWeeklyNote',month:'openOrCreateGCMonth',quarter:'openOrCreateGCQuarter',year:'openOrCreateGCYear'}[mode];
   if(typeof view?.[method]!=='function')throw new Error('当前 New Calendar Suite 版本不支持该入口；请更新日历插件');
   return view[method](date,false);
  }
@@ -565,6 +610,20 @@ class UCITHome extends Plugin {
   const updated=buildUpdate(current,input,records,this.now());
   await this.app.vault.process(current.file,raw=>{if(raw!==snapshot.raw)throw new Error('保存前笔记已变化，请重新打开表单');return updated;});
  });}
+ async createProject(line,defaultArea=this.settings.projectArea){return this.exclusive(async()=>{
+  const input=parseProjectLine(line,defaultArea);const records=await readRecords(this.app);
+  let max=Number(this.settings.counters.__projects)||0;
+  const reserve=value=>{const m=/^PRJ-(\d+)(?:$|[- ])/.exec(String(value));if(m)max=Math.max(max,Number(m[1]));};
+  for(const item of records)reserve(item.ucit);
+  for(const f of this.app.vault.getAllLoadedFiles())for(const segment of f.path.split('/'))reserve(segment);
+  const number=max+1,id='PRJ-'+String(number).padStart(3,'0'),folder='projects/'+id+' '+input.title,path=folder+'/HOME.md',now=this.now();
+  const data={ucit_version:2,kind:'project',ucit:id,title:input.title,area:input.area,status:'planned',created:now,updated:now,review_on:now,goal:'',outcome:'',budget:'',next_action:'',task_source:folder+'/tasks',depends_on:[],evidence:[]};
+  if(input.due){data.due=input.due;data.due_type='internal_checkpoint';}
+  validateRecord({...data,file:{path}},[...records,{...data,file:{path}}]);
+  this.settings.counters.__projects=number;await this.saveSettings();
+  await this.ensureFolder(folder+'/tasks');
+  return this.app.vault.create(path,noteText(data,'# '+id+' '+input.title+'\n\n## 成果与范围\n\n通过 UCIT 调整表单填写目标、成果、预算与下一步，再激活项目。\n\n## 阶段安排\n\n| 日期范围 | 阶段成果 | 任务链接 | 投入上限 |\n|---|---|---|---|\n\n## 证据与验收\n\n## 复用与后续\n'));
+ });}
  async createTask(input){return this.exclusive(async()=>{
   const records=await readRecords(this.app);const parent=records.find(x=>x.ucit===input.project && x.kind==='project');
   if(!parent || parent.status==='closed')throw new Error('请选择未关闭的父项目');
@@ -594,7 +653,7 @@ class UCITHome extends Plugin {
   if(!validDate(anchor))throw new Error('日期无效');
   if(this.calendarEnabled())return this.openCalendarNote(mode,anchor);
   if(NC_MODES.includes(mode))throw new Error('NC 计划需要启用 New Calendar Suite');
-  const p=period(anchor,mode);const folders={day:this.settings.dailyFolder,week:this.settings.weeklyFolder,month:this.settings.monthlyFolder};
+  const p=period(anchor,mode);const folders={day:this.settings.dailyFolder,week:this.settings.weeklyFolder,month:this.settings.monthlyFolder,quarter:this.settings.quarterlyFolder,year:this.settings.yearlyFolder};
   const folder=String(folders[mode]||'').trim().replace(/\\/g,'/').replace(/\/$/,'');
   if(!folder || folder.startsWith('/') || folder.split('/').some(x=>x==='..' || x==='.' || x.startsWith('.')))throw new Error('请在设置中填写有效的独立计划文件夹');
   const path=folder+'/'+p.key+'.md';
@@ -608,7 +667,7 @@ class UCITHome extends Plugin {
      if(this.app.vault.getAbstractFileByPath(path))return;
      const records=await readRecords(this.app);const items=filteredTasks(records,{horizon:mode,hideClosed:true},anchor);
      const links=items.map(x=>'- [['+x.file.path.replace(/\.md$/,'')+']]').join('\n')||'尚无关联任务；从 UCIT 主页创建。';
-     const data={'gc-type':{day:'daily',week:'weekly',month:'monthly'}[mode],date:p.start,created:this.now(),ucit_plan:true};
+     const data={'gc-type':{day:'daily',week:'weekly',month:'monthly',quarter:'quarterly',year:'yearly'}[mode],date:p.start,created:this.now(),ucit_plan:true};
      const body='# '+p.key+'\n\n[[UCIT 今日主页]] · [[UCIT 插件使用指南]]\n\n## 本期成果（最多三项）\n\n明确交付与验收，不以收集资料数量代替成果。\n\n## 时间安排\n\n| 日期 / 时间块 | 任务链接 | 预期产物 | 实际证据 |\n|---|---|---|---|\n\n## 创建时的任务入口\n\n这是链接快照；实时状态以任务属性与主页为准。\n\n'+links+'\n\n## 闭环复盘\n\n- 实际成果与证据：\n- 偏差及阻塞：\n- 决定与下一步（回写任务）：\n- 可复用的方法 / 技能：\n';
      await this.ensureFolder(path.slice(0,path.lastIndexOf('/')));await this.app.vault.create(path,noteText(data,body));
     });
@@ -625,4 +684,4 @@ class UCITHome extends Plugin {
  }
 }
 module.exports=UCITHome;
-module.exports._test={day,today,validDate,period,parseNote,noteText,collect,readRecords,validateRecord,buildUpdate,filteredTasks,blockers,LABELS,UCITView,WorkModal,DEFAULTS,suiteRange,workloadIndex,workloadMetadata,detectPeriod,UCITPlanBlock};
+module.exports._test={day,today,validDate,period,parseNote,noteText,collect,readRecords,validateRecord,buildUpdate,filteredTasks,blockers,LABELS,UCITView,WorkModal,ProjectModal,parseProjectLine,DEFAULTS,suiteRange,workloadIndex,workloadMetadata,detectPeriod,UCITPlanBlock};

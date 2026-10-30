@@ -26,6 +26,16 @@ Requires Obsidian 1.5.0 or newer. New Calendar Suite is optional. No build step 
 - Stale-edit protection and an appended decision/change history.
 - Live `ucit` Markdown blocks in periodic notes.
 
+## Quick Add Project (0.4.0)
+
+Run **UCIT Home: 一行新建项目** or click **＋ 新项目**, then enter:
+
+```text
+Build my portfolio | MiniEnter | due:2026-11-30
+```
+
+Enter submits (IME composition is ignored). Owner and deadline are optional; a title alone uses the visible, configurable default owner (initially MiniEnter). UCIT reserves a `PRJ-NNN` ID and creates `projects/<ID> <title>/HOME.md` plus `tasks/`. The project starts planned and due for review today. Fill goal/outcome/budget/next action through **调整 / 闭环** before activation. The deadline is an internal checkpoint. Existing IDs are preserved.
+
 ## Start with one project
 
 UCIT indexes Markdown under `projects/` with `ucit_version: 2` and `kind: project` or `task`. It does not infer current work from legacy codes or ordinary notes.
@@ -91,7 +101,7 @@ show_closed: false
 ```
 ````
 
-Supported periods: `day`, `week`, `month`, `nc-phase`, `nc-month`, `nc-season`, `nc-year`. Omit `project` to include all projects. The live panel includes in-period scheduled/due/review dates, open earlier commitments and active/waiting work. It is a current operational view, not a historical snapshot. It renders in Reading view and rendered Live Preview blocks; source mode shows the code.
+Supported periods: `day`, `week`, `month`, `quarter`, `year`, `nc-phase`, `nc-month`, `nc-season`, `nc-year`. Omit `project` to include all projects. The live panel includes in-period scheduled/due/review dates, open earlier commitments and active/waiting work. It is a current operational view, not a historical snapshot. It renders in Reading view and rendered Live Preview blocks; source mode shows the code.
 
 Auto detection understands `gc-type: daily/weekly/monthly`, NCS `nc-type: phase/month/season/year`, `date`, `gc-date`, and configured filenames. Ambiguous ordinary notes need an explicit period/date.
 
@@ -126,3 +136,5 @@ The usage website is generated from `docs/usage.json`. Follow [the maintenance g
 ## License
 
 MIT. Copyright © 2026 Jason Shelter.
+
+GC quarter/year navigation now delegates to NCS too. Both calendars share daily/weekly notes. Reschedule the original task’s execution date, keeping its delivery deadline independent; multi-day allocation and automatic rollover are not implemented. See the usage guide for the complete planning structure.
