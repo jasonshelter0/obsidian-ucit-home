@@ -1,9 +1,9 @@
 {
   "id": "ucit-home",
   "name": "UCIT Home",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minAppVersion": "1.5.0",
-  "description": "Outcome-oriented PAWSC task planning, evidence-based closure and New Calendar Suite integration.",
+  "description": "Self-contained PAWSC project planning, diagnostics, evidence-based closure and optional calendar integration.",
   "author": "Jason Shelter",
   "isDesktopOnly": false,
   "authorUrl": "https://github.com/jasonshelter0"

@@ -1,3 +1,10 @@
+## 0.5.0 — 2026-11-16
+
+- Add an in-plugin whole-ledger diagnostics report grouped by project.
+- Add clipboard export for the diagnostics report and portable managed-record JSON.
+- Embed concise help and link the full multilingual guide, removing the runtime dependency on a vault-side guide note.
+- Complete the migration away from the legacy Python CLI and vault-hosted development checkout.
+
 ## 0.4.0 — 2026-10-30
 
 - Add one-line project capture from command palette/dashboard, optional owner/deadline, reserved PRJ identifiers and independent folders.

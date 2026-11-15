@@ -25,8 +25,11 @@ Requires Obsidian 1.5.0 or newer. New Calendar Suite is optional. No build step 
 - Daily capacity comparison using `scheduled_on` and `estimate_hours`.
 - Stale-edit protection and an appended decision/change history.
 - Live `ucit` Markdown blocks in periodic notes.
+- Whole-ledger diagnostics grouped by project, with portable JSON export to the clipboard.
 
-## Quick Add Project (0.4.0)
+The installed plugin is self-contained: it does not require a source checkout, Python helper, vault-side guide, Node dependencies or build tools. Project and task Markdown remain your portable source of truth. New Calendar Suite remains an optional adapter for NC periods and shared calendar behavior.
+
+## Quick Add Project
 
 Run **UCIT Home: 一行新建项目** or click **＋ 新项目**, then enter:
 
@@ -113,6 +116,7 @@ Auto detection understands `gc-type: daily/weekly/monthly`, NCS `nc-type: phase/
 - Creation reserves ID high-water marks in plugin `data.json`. Keep this file when syncing or migrating. Completely deleted historical IDs without any surviving reservation cannot be reconstructed.
 - Writes are serialized within one plugin instance. The target note is checked against the editor's original contents and updated through `Vault.process`. There is no cross-device transaction or shared lock with external scripts; use one writer for related tasks at a time.
 - This plugin does not execute commands from notes, start experiments, or run autonomous research.
+- Run **UCIT Home: 检查全部记录** for a complete validation report. The modal can copy either the report or all managed records as JSON without note bodies or plugin settings.
 
 ## Development
 

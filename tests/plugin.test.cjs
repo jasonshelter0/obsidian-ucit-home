@@ -254,6 +254,23 @@ test('one-line project capture validates title, owner and deadline before any wr
  assert.equal(d.area,'[[RefCom]]');assert.equal(d.due,'2026-11-30');
  assert.equal(h.parseProjectLine('Title','MiniHome').area,'[[MiniHome]]');
 });
+
+test('diagnostics groups validation failures and exports portable records',()=>{
+ const p=project();
+ const good=task(1);
+ const bad=task(2,'waiting',{waiting_for:'',review_on:''});
+ const report=h.diagnosticReport([p,good,bad]);
+ assert.equal(report.summary.records,3);
+ assert.equal(report.summary.projects,1);
+ assert.equal(report.summary.tasks,2);
+ assert.equal(report.summary.issues,1);
+ assert.equal(report.issues[0].project,'ABC-001');
+ assert.match(report.issues[0].message,/复查日期|等待/);
+ const exported=h.exportRecords([{...good,raw:'private raw',file:{path:'projects/demo.md'}}]);
+ assert.equal(exported[0].path,'projects/demo.md');
+ assert.equal('raw' in exported[0],false);
+ assert.equal('file' in exported[0],false);
+});
 test('project creation serializes IDs, reserves old folders and keeps captured projects planned',async()=>{
  const {p,files,texts}=plugin([]);files.set('projects/PRJ-009 old',{path:'projects/PRJ-009 old'});
  const created=await Promise.all([p.createProject('First | MiniEnter'),p.createProject('Second | RefCom | due:2026-11-30')]);

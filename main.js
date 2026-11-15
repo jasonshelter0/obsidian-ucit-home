@@ -2,7 +2,6 @@ const {Plugin, ItemView, Notice, Modal, Setting, PluginSettingTab, MarkdownRende
 const TYPE = 'ucit-home-view';
 const LABELS = {planned:'P 待计划', active:'A 推进中', waiting:'W 等待', suspended:'S 暂停', closed:'C 已关闭'};
 const DEFAULTS = {openOnStartup:true, timezone:'Asia/Shanghai', dailyHours:8, hideClosed:false, calendarIntegration:true, calendarMarkers:true, dailyFolder:'areas/periodicNotes/daily', weeklyFolder:'areas/periodicNotes/weekly', monthlyFolder:'areas/periodicNotes/gc-monthly', quarterlyFolder:'areas/periodicNotes/gc-quarterly', yearlyFolder:'areas/periodicNotes/gc-yearly', projectArea:'MiniEnter', homeNote:'areas/things/UCIT 今日主页', counters:{}};
-const GUIDE = 'utilities/ucit/UCIT 插件使用指南';
 const array = v => Array.isArray(v) ? v : [];
 const day = v => v instanceof Date ? v.toISOString().slice(0,10) : String(v || '').slice(0,10);
 const required = (v, message) => { if (!String(v ?? '').trim()) throw new Error(message); };
@@ -127,6 +126,19 @@ function validateRecord(d,records) {
  }
  // Reopening/cancelling a successful dependency must not invalidate active successors.
  if(!(d.status==='closed' && d.resolution==='done') && records.some(x=>x.status==='active' && array(x.depends_on).includes(d.ucit))) throw new Error('有推进中的任务依赖此成果；请先调整后续任务');
+}
+function diagnosticReport(records) {
+ const issues=[];const seen=new Set();
+ for(const item of records) {
+  if(seen.has(item.ucit))issues.push({ucit:item.ucit||'（缺少编号）',project:item.kind==='project'?item.ucit:(parentOf(item,records)?.ucit||'未归属'),message:'重复 UCIT 编号'});
+  seen.add(item.ucit);
+  try {validateRecord(item,records);}
+  catch(e){issues.push({ucit:item.ucit||'（缺少编号）',project:item.kind==='project'?item.ucit:(parentOf(item,records)?.ucit||'未归属'),message:e.message});}
+ }
+ return {generated_at:new Date().toISOString(),summary:{records:records.length,projects:records.filter(x=>x.kind==='project').length,tasks:records.filter(x=>x.kind==='task').length,issues:issues.length},issues};
+}
+function exportRecords(records) {
+ return records.map(({file,raw,...item})=>({...item,path:file?.path||''})).sort((a,b)=>String(a.ucit).localeCompare(String(b.ucit)));
 }
 function buildUpdate(item,input,records,now) {
  required(input.reason,'请写明本次决定或调整原因');
@@ -363,6 +375,26 @@ class ProjectModal extends Modal {
   const save=button(el,'创建项目',submit,'mod-cta');button(el,'取消',()=>this.close());
  }
 }
+class DiagnosticsModal extends Modal {
+ constructor(plugin){super(plugin.app);this.plugin=plugin;}
+ async onOpen(){
+  const el=this.contentEl;el.empty();el.addClass('ucit-form');el.createEl('h2',{text:'UCIT 全库检查'});
+  const status=el.createEl('p',{text:'正在读取受管记录…',cls:'ucit-subtitle'});
+  try {
+   const records=await readRecords(this.app);const report=diagnosticReport(records);
+   status.setText(`${report.summary.records} 条记录 · ${report.summary.projects} 个项目 · ${report.summary.tasks} 个任务 · ${report.summary.issues} 个问题`);
+   if(!report.issues.length)el.createEl('p',{text:'全部受管记录通过检查。',cls:'ucit-success'});
+   else {
+    const groups=new Map();for(const issue of report.issues){if(!groups.has(issue.project))groups.set(issue.project,[]);groups.get(issue.project).push(issue);}
+    for(const [project,issues] of groups){const section=el.createEl('details');section.open=true;section.createEl('summary',{text:project+' · '+issues.length});for(const issue of issues)section.createEl('p',{text:issue.ucit+'：'+issue.message,cls:'ucit-warning'});}
+   }
+   const actions=el.createDiv({cls:'ucit-nav'});
+   button(actions,'复制检查报告 JSON',async()=>{await navigator.clipboard.writeText(JSON.stringify(report,null,2));new Notice('检查报告已复制');});
+   button(actions,'复制全部记录 JSON',async()=>{await navigator.clipboard.writeText(JSON.stringify(exportRecords(records),null,2));new Notice('全部记录 JSON 已复制');});
+   button(actions,'关闭',()=>this.close());
+  }catch(e){status.setText(e.message);status.addClass('ucit-warning');}
+ }
+}
 class UCITSettings extends PluginSettingTab {
  constructor(app,plugin){super(app,plugin);this.plugin=plugin;}
  display(){
@@ -375,6 +407,7 @@ class UCITSettings extends PluginSettingTab {
   new Setting(el).setName('日历显示 UCIT 标记').addToggle(c=>c.setValue(this.plugin.settings.calendarMarkers).onChange(async v=>{this.plugin.settings.calendarMarkers=v;await this.plugin.saveSettings();this.plugin.refresh();}));
   for(const [key,label] of [['dailyFolder','独立模式日计划文件夹'],['weeklyFolder','独立模式周计划文件夹'],['monthlyFolder','独立模式月计划文件夹'],['quarterlyFolder','独立模式季计划文件夹'],['yearlyFolder','独立模式年计划文件夹'],['projectArea','新项目默认主责（笔记名称）'],['homeNote','文字主页路径']])new Setting(el).setName(label).addText(c=>c.setValue(this.plugin.settings[key]).onChange(async v=>{this.plugin.settings[key]=v;await this.plugin.saveSettings();}));
   button(el,'重新连接日历标记',()=>this.plugin.reconnectCalendars());
+  button(el,'检查全部记录',()=>new DiagnosticsModal(this.plugin).open());
   button(el,'打开使用指南',()=>this.plugin.openGuide());
  }
 }
@@ -394,6 +427,7 @@ class UCITView extends ItemView {
   button(nav,'＋ 新任务',()=>new WorkModal(this.plugin,null,this.filters.project,now).open(),'mod-cta');
   for(const [mode,name] of [['day','今日计划'],['week','本周计划'],['month','本月计划'],['quarter','本季计划'],['year','本年计划']]) button(nav,name,()=>this.plugin.openPeriod(mode,now));
   button(nav,'文字主页',()=>this.app.workspace.openLinkText(this.plugin.settings.homeNote,'',false));
+  button(nav,'全库检查',()=>new DiagnosticsModal(this.plugin).open());
   button(nav,'使用指南',()=>this.plugin.openGuide());
   button(nav,'刷新',()=>this.render());
   if(this.plugin.calendarEnabled()) {
@@ -450,9 +484,8 @@ class UCITView extends ItemView {
    if(!items.length)lane.createEl('p',{text:'暂无',cls:'ucit-empty'});
    for(const t of items)this.card(lane,t,data,now);
   }
-  const issues=[];const ids=new Set();
-  for(const x of data){if(ids.has(x.ucit))issues.push('重复编号 '+x.ucit);ids.add(x.ucit);try{validateRecord(x,data);}catch(e){issues.push(x.ucit+'：'+e.message);}}
-  if(issues.length){const panel=el.createEl('details');panel.createEl('summary',{text:'需修正 · '+issues.length});for(const msg of issues)panel.createEl('p',{text:msg});}
+  const issues=diagnosticReport(data).issues;
+  if(issues.length){const panel=el.createEl('details');panel.createEl('summary',{text:'需修正 · '+issues.length});for(const issue of issues)panel.createEl('p',{text:issue.ucit+'：'+issue.message});}
   el.createEl('p',{text:'状态表示承诺，不代表后台进程。保存调整会记录原因；成功关闭需要证据。历史 PALXOS 不自动计入。',cls:'ucit-subtitle'});
  }
  agenda(el,tasks,p,now){
@@ -518,6 +551,7 @@ class UCITHome extends Plugin {
   this.addCommand({id:'edit-current',name:'调整当前任务或项目',checkCallback:checking=>{
    const file=this.app.workspace.getActiveFile();const item=collect(this.app).find(x=>x.file.path===file?.path);if(!item)return false;if(!checking)new WorkModal(this,item).open();return true;
   }});
+  this.addCommand({id:'diagnostics',name:'检查全部记录',callback:()=>new DiagnosticsModal(this).open()});
   this.addCommand({id:'open-guide',name:'打开使用指南',callback:()=>this.openGuide()});
   let timer;
   const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>this.refresh(),300);};
@@ -587,11 +621,13 @@ class UCITHome extends Plugin {
   if(view){view.anchor=anchor;view.filters.horizon=mode;view.render();}
  }
  async openGuide(){
-  if(this.app.vault.getAbstractFileByPath(GUIDE+'.md'))return this.app.workspace.openLinkText(GUIDE,'',false);
   const modal=new Modal(this.app);modal.contentEl.createEl('h2',{text:'UCIT Home'});
-  modal.contentEl.createEl('p',{text:'新建任务 → 安排日期与预计小时 → 更新 PAWSC → 记录证据并验收。New Calendar Suite 启用时，计划入口使用其模板和文件夹。'});
-  modal.contentEl.createEl('p',{text:'在周期笔记插入 ucit 代码块，内容为 period: auto，即可嵌入实时任务面板。也可指定 period: day 和 date: YYYY-MM-DD。'});
-  modal.contentEl.createEl('a',{text:'Documentation / 使用指南',href:'https://github.com/jasonshelter0/obsidian-ucit-home#readme'});modal.open();
+  modal.contentEl.createEl('p',{text:'闭环：建立项目 → 写清成果与预算 → 创建可验收任务 → 安排日期和预计小时 → 更新 PAWSC → 记录证据 → 验收或退出。'});
+  const list=modal.contentEl.createEl('ul');
+  for(const text of ['一行新建项目：名称 | 主责 | due:YYYY-MM-DD；主责和日期可省略。','scheduled_on 是执行日，due 是交付日，review_on 是复查日。','A/W 必须写下一步与复查日期；C 必须选择结论并填写证据或决定记录。','运行“检查全部记录”可查看全库问题，也可复制 JSON 报告或全部记录。','周期笔记可插入 ucit 代码块并使用 period: auto。New Calendar Suite 启用时，NC 与日历入口使用其设置。'])list.createEl('li',{text});
+  modal.contentEl.createEl('a',{text:'完整三语使用指南',href:'https://www.jasonshelter.com/zh-cn/projects/ucit-home/'});
+  modal.contentEl.createEl('br');modal.contentEl.createEl('a',{text:'GitHub repository',href:'https://github.com/jasonshelter0/obsidian-ucit-home'});
+  button(modal.contentEl,'关闭',()=>modal.close());modal.open();
  }
  now(){return today(this.settings.timezone);}
  saveSettings(){return this.saveData(this.settings);}
@@ -668,7 +704,7 @@ class UCITHome extends Plugin {
      const records=await readRecords(this.app);const items=filteredTasks(records,{horizon:mode,hideClosed:true},anchor);
      const links=items.map(x=>'- [['+x.file.path.replace(/\.md$/,'')+']]').join('\n')||'尚无关联任务；从 UCIT 主页创建。';
      const data={'gc-type':{day:'daily',week:'weekly',month:'monthly',quarter:'quarterly',year:'yearly'}[mode],date:p.start,created:this.now(),ucit_plan:true};
-     const body='# '+p.key+'\n\n[[UCIT 今日主页]] · [[UCIT 插件使用指南]]\n\n## 本期成果（最多三项）\n\n明确交付与验收，不以收集资料数量代替成果。\n\n## 时间安排\n\n| 日期 / 时间块 | 任务链接 | 预期产物 | 实际证据 |\n|---|---|---|---|\n\n## 创建时的任务入口\n\n这是链接快照；实时状态以任务属性与主页为准。\n\n'+links+'\n\n## 闭环复盘\n\n- 实际成果与证据：\n- 偏差及阻塞：\n- 决定与下一步（回写任务）：\n- 可复用的方法 / 技能：\n';
+     const body='# '+p.key+'\n\n[[UCIT 今日主页]] · 插件命令：UCIT Home → 打开使用指南\n\n## 本期成果（最多三项）\n\n明确交付与验收，不以收集资料数量代替成果。\n\n## 时间安排\n\n| 日期 / 时间块 | 任务链接 | 预期产物 | 实际证据 |\n|---|---|---|---|\n\n## 创建时的任务入口\n\n这是链接快照；实时状态以任务属性与主页为准。\n\n'+links+'\n\n## 闭环复盘\n\n- 实际成果与证据：\n- 偏差及阻塞：\n- 决定与下一步（回写任务）：\n- 可复用的方法 / 技能：\n';
      await this.ensureFolder(path.slice(0,path.lastIndexOf('/')));await this.app.vault.create(path,noteText(data,body));
     });
     modal.close();await this.app.workspace.openLinkText(path,'',false);
@@ -684,4 +720,4 @@ class UCITHome extends Plugin {
  }
 }
 module.exports=UCITHome;
-module.exports._test={day,today,validDate,period,parseNote,noteText,collect,readRecords,validateRecord,buildUpdate,filteredTasks,blockers,LABELS,UCITView,WorkModal,ProjectModal,parseProjectLine,DEFAULTS,suiteRange,workloadIndex,workloadMetadata,detectPeriod,UCITPlanBlock};
+module.exports._test={day,today,validDate,period,parseNote,noteText,collect,readRecords,validateRecord,diagnosticReport,exportRecords,buildUpdate,filteredTasks,blockers,LABELS,UCITView,WorkModal,ProjectModal,DiagnosticsModal,parseProjectLine,DEFAULTS,suiteRange,workloadIndex,workloadMetadata,detectPeriod,UCITPlanBlock};
